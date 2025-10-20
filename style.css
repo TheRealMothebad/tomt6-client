@@ -1,0 +1,81 @@
+body {
+  background-color: #333;
+  color: #eee; /* Make text light for contrast */
+}
+
+.player-box.is-you {
+  background-color: purple;
+  color: white;
+}
+
+.current-turn {
+  border: 2px solid orange;
+}
+
+.inactive-player {
+  color: grey;
+}
+
+.frozen-player {
+  background-color: rgba(0, 0, 255, 0.3); /* Semi-transparent blue */
+  color: #add8e6; /* Light blue text */
+}
+
+#players-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 20px;
+}
+
+.player-box {
+
+  background-color: #444;
+
+  border-radius: 8px;
+
+  padding: 15px;
+
+  margin: 10px;
+
+  width: 300px;
+
+}
+
+
+
+.controls-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 20px;
+  background-color: #333;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid #ccc;
+}
+
+.controls-container button {
+  font-size: 24px;
+  padding: 15px 30px;
+  margin: 0 10px;
+  background-color: #555;
+  color: #eee;
+}
+
+.color-picker-widget {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.color-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #ccc;
+  margin-bottom: 5px;
+  cursor: pointer;
+}

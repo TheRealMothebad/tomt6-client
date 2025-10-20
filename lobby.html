@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Turn Over More Than 6</title>
+<link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+
+<body>
+  <h2 id="welcomeMessage"></h2>
+
+  <script>
+    let pollingInterval;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      let name = localStorage.getItem("name") || sessionStorage.getItem("name");
+      if (!name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        name = urlParams.get("name");
+      }
+
+      if (name) {
+        document.getElementById("welcomeMessage").textContent = `Welcome ${name}, waiting for game to start...`;
+      } else {
+        document.getElementById("welcomeMessage").textContent = "Welcome (name error?), waiting for game to start...";
+      }
+      pollingInterval = setInterval(check_game_status, 2000); // Check every 2 seconds
+    });
+
+    async function check_game_status() {
+      let uuid = localStorage.getItem("uuid") || sessionStorage.getItem("uuid");
+      if (!uuid) {
+        const urlParams = new URLSearchParams(window.location.search);
+        uuid = urlParams.get("uuid");
+      }
+
+      try {
+        const response = await fetch(`https://tomt6.umbriac.com/game_status?uuid=${uuid}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.game_started) {
+            clearInterval(pollingInterval);
+            window.location.href = `game.html?uuid=${uuid}`;
+          }
+        }
+      } catch (error) {
+        console.error("Error checking game status:", error);
+      }
+    }
+  </script>
+</body>

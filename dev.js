@@ -1,1 +1,1 @@
-window.IS_DEV = true;
+window.IS_DEV = false;

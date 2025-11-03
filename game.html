@@ -20,33 +20,53 @@
     <button type="button" onclick="fold()">fold</button>
   </div>
 
-  <p id="action"></p>
+  <div id="action-feed"></div>
   <div id="players-container">
   </div>
 
   <p id="not_pretty"></p> 
+  <script src="dev.js"></script>
   <script>
-    console.log("UUID from localStorage on game.html load:", localStorage.getItem("uuid"));
-    let uuid = localStorage.getItem("uuid") || sessionStorage.getItem("uuid");
-    if (!uuid) {
-      const urlParams = new URLSearchParams(window.location.search);
-      uuid = urlParams.get("uuid");
-    }
-    const socket = new WebSocket("wss://tomt6.umbriac.com/game");
-    const message = JSON.stringify({"uuid": uuid});
-    socket.onopen = () => {
-      socket.send(message);
-      socket.send(JSON.stringify({"action":"state"}));
-    };
+    let socket;
+    (async () => {
+      let uuid = getParam("uuid");
 
-    socket.onmessage = (e) => {
-      console.log("Received:", e);
-      let parsed = JSON.parse(e.data);
-      
-      document.getElementById("action").textContent = generate_action_message(parsed.action, parsed.game);
-      pretty_print(parsed.game, uuid);
-      //document.getElementById("not_pretty").textContent = JSON.stringify(parsed);
-    }
+      let socketUrl = "wss://tomt6.umbriac.com/game";
+      if (window.IS_DEV) {
+        console.log('Development environment detected, using localhost for WebSocket.');
+        socketUrl = 'ws://localhost:8080/game';
+      }
+
+      socket = new WebSocket(socketUrl);
+      const message = JSON.stringify({"uuid": uuid});
+      socket.onopen = () => {
+        socket.send(message);
+        socket.send(JSON.stringify({"action":"state"}));
+      };
+
+      socket.onmessage = (e) => {
+        console.log("Received:", e);
+        let parsed = JSON.parse(e.data);
+        
+        const actionFeed = document.getElementById("action-feed");
+
+        if (parsed.action) { // A single new action
+          const newMessage = document.createElement("p");
+          newMessage.textContent = generate_action_message(parsed.action, parsed.game);
+          actionFeed.prepend(newMessage);
+        } else if (parsed.game && parsed.game.actions_log) { // Initial state with action log
+          actionFeed.innerHTML = ''; // Clear the feed before populating
+          for (const action of parsed.game.actions_log) {
+            const newMessage = document.createElement("p");
+            newMessage.textContent = generate_action_message(action, parsed.game);
+            actionFeed.prepend(newMessage);
+          }
+        }
+
+        pretty_print(parsed.game, uuid);
+        //document.getElementById("not_pretty").textContent = JSON.stringify(parsed);
+      }
+    })();
 
     function generate_action_message(action, game) {
       if (!action) {
@@ -65,6 +85,17 @@
           return `${actorName} used ${fancy_name(action.card)} on ${targetName}.`;
         case "shuffle":
           return "The discard pile was shuffled into the deck.";
+        case "connect":
+          if (action.target == 1) {
+            return `${actorName} connected.`;
+          }
+          else {
+            return `${actorName} disconnected.`;
+          }
+        case "die":
+          return `${actorName} died from drawing another ${fancy_name(action.card)}`
+        case "end":
+          return `Game has ended! ${actorName} won with a score of ${game.players[action.actor].score}!`
         default:
           return ``;
       }
@@ -102,7 +133,6 @@
       return card;
     }
 
-
     function pretty_print(game, clientUuid) {
       const playersContainer = document.getElementById("players-container");
       playersContainer.innerHTML = ""; // Clear previous content
@@ -117,7 +147,6 @@
           nameText += " <- Forced Draws";
           playerContainer.classList.add("current-turn");
         } else if (player.order === game.current_player) {
-          nameText += " <- Current Player";
           playerContainer.classList.add("current-turn");
         }
 
@@ -135,14 +164,26 @@
         const attributesP = document.createElement("p");
         attributesP.innerHTML = `
           Cards: ${player.cards.map(fancy_name).join(", ")}<br>
-          Frozen: ${player.frozen}<br>
-          Folded: ${player.folded}<br>
           Lost: ${player.lost}<br>
           Second Chances: ${player.second_chances}<br>
-          Score: ${player.score}<br>
-          Connected: ${player.connected}
+          Score: ${player.score}
         `;
         playerContainer.appendChild(attributesP);
+
+        const statusDiv = document.createElement("div");
+        statusDiv.classList.add("player-status-icons");
+        if (player.frozen) {
+          statusDiv.innerHTML += '<span title="Frozen">❄️</span>';
+        }
+        if (player.folded) {
+          statusDiv.innerHTML += '<span title="Folded">🛑</span>';
+        }
+        if (player.connected) {
+          statusDiv.innerHTML += '<span title="Connected">🔗</span>';
+        } else {
+          statusDiv.innerHTML += '<span title="Disconnected">🔌</span>';
+        }
+        playerContainer.appendChild(statusDiv);
 
         // Add the "Use on this player" button
         const useButton = document.createElement("button");
@@ -158,6 +199,15 @@
       discard pile: ${fancy_name(game.top_discard) ?? ""}<br>
       round number: ${game.round_number}
       `;
+    }
+
+    function getParam(param) {
+      let res = localStorage.getItem(param) || sessionStorage.getItem(param);
+      if (!res) {
+        const urlParams = new URLSearchParams(window.location.search);
+        res = urlParams.get(param);
+      }
+      return res;
     }
 
   </script>

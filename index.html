@@ -40,6 +40,7 @@
         baseUrl = 'http://localhost:8080';
       }
       fetch_games_and_lobbies();
+      setInterval(fetch_games_and_lobbies, 2000);
     })();
 
     async function fetch_games_and_lobbies() {

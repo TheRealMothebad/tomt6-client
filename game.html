@@ -14,201 +14,31 @@
     <button class="color-btn" style="background-color: purple;" onclick="change_color('purple')"></button>
   </div>
 
-  <h2>Turn Over More Than 6 Active Game</h2>
-  <div class="controls-container">
-    <button type="button" onclick="draw()">draw</button>
-    <button type="button" onclick="fold()">fold</button>
-  </div>
 
-  <div id="action-feed"></div>
-  <div id="players-container">
+  <div id="lobby-screen">
+    <h2 id="welcomeMessage"></h2>
+
+    <h3>Players in lobby:</h3>
+    <div id="player-list">
+      <!-- player list will be populated here -->
+    </div>
+
+    <button type="button" onclick="start_game()" id="start-game-button" style="display: none;">Start Game</button>
+    <p id="errors"></p>
+  </div>
+  <div id="game-screen" style="display: none;">
+    <h2>Turn Over More Than 6 Active Game</h2>
+    <div class="controls-container">
+      <button type="button" onclick="draw()">draw</button>
+      <button type="button" onclick="fold()">fold</button>
+    </div>
+
+    <div id="action-feed"></div>
+    <div id="players-container">
+    </div>
   </div>
 
   <p id="not_pretty"></p> 
   <script src="dev.js"></script>
-  <script>
-    let socket;
-    (async () => {
-      let uuid = getParam("uuid");
-
-      let socketUrl = "wss://tomt6.umbriac.com/game";
-      if (window.IS_DEV) {
-        console.log('Development environment detected, using localhost for WebSocket.');
-        socketUrl = 'ws://localhost:8080/game';
-      }
-
-      socket = new WebSocket(socketUrl);
-      const message = JSON.stringify({"uuid": uuid});
-      socket.onopen = () => {
-        socket.send(message);
-        socket.send(JSON.stringify({"action":"state"}));
-      };
-
-      socket.onmessage = (e) => {
-        console.log("Received:", e);
-        let parsed = JSON.parse(e.data);
-        
-        const actionFeed = document.getElementById("action-feed");
-
-        if (parsed.action) { // A single new action
-          const newMessage = document.createElement("p");
-          newMessage.textContent = generate_action_message(parsed.action, parsed.game);
-          actionFeed.prepend(newMessage);
-        } else if (parsed.game && parsed.game.actions_log) { // Initial state with action log
-          actionFeed.innerHTML = ''; // Clear the feed before populating
-          for (const action of parsed.game.actions_log) {
-            const newMessage = document.createElement("p");
-            newMessage.textContent = generate_action_message(action, parsed.game);
-            actionFeed.prepend(newMessage);
-          }
-        }
-
-        pretty_print(parsed.game, uuid);
-        //document.getElementById("not_pretty").textContent = JSON.stringify(parsed);
-      }
-    })();
-
-    function generate_action_message(action, game) {
-      if (!action) {
-        return "";
-      }
-
-      const actorName = game.players[action.actor] ? game.players[action.actor].name : "Unknown Player";
-
-      switch (action.action) {
-        case "draw":
-          return `${actorName} drew the card ${fancy_name(action.card)}.`;
-        case "fold":
-          return `${actorName} folded.`;
-        case "use":
-          const targetName = game.players[action.target] ? game.players[action.target].name : "Unknown Player";
-          return `${actorName} used ${fancy_name(action.card)} on ${targetName}.`;
-        case "shuffle":
-          return "The discard pile was shuffled into the deck.";
-        case "connect":
-          if (action.target == 1) {
-            return `${actorName} connected.`;
-          }
-          else {
-            return `${actorName} disconnected.`;
-          }
-        case "die":
-          return `${actorName} died from drawing another ${fancy_name(action.card)}`
-        case "end":
-          return `Game has ended! ${actorName} won with a score of ${game.players[action.actor].score}!`
-        default:
-          return ``;
-      }
-    }
-
-    function draw() {
-      console.log("attempting draw");
-      socket.send(JSON.stringify({"action":"draw"}));
-    }
-    function fold() {
-      console.log("attempting fold");
-      socket.send(JSON.stringify({"action":"fold"}));
-    }
-    function use(order_target) {
-      console.log("use on", order_target);
-      socket.send(JSON.stringify({"action":"use", "target":order_target}));
-    }
-
-    function change_color(color) {
-      const isYouBox = document.querySelector('.is-you');
-      if (isYouBox) {
-        isYouBox.style.backgroundColor = color;
-      }
-    }
-
-    function fancy_name(card) {
-      switch(card) {
-        case "f":
-          return "freeze";
-        case "d":
-          return "draw three";
-        case "s":
-          return "second life";
-      }
-      return card;
-    }
-
-    function pretty_print(game, clientUuid) {
-      const playersContainer = document.getElementById("players-container");
-      playersContainer.innerHTML = ""; // Clear previous content
-
-      for (const player of game.players) {
-        const playerContainer = document.createElement("div");
-        playerContainer.classList.add("player-box");
-
-        const nameHeader = document.createElement("h3");
-        let nameText = player.name;
-        if (game.forced_draws && game.forced_draws[0] === player.order) {
-          nameText += " <- Forced Draws";
-          playerContainer.classList.add("current-turn");
-        } else if (player.order === game.current_player) {
-          playerContainer.classList.add("current-turn");
-        }
-
-        if (player.frozen || player.folded || player.lost) {
-          nameHeader.classList.add("inactive-player");
-        }
-
-        if (player.uuid === clientUuid) {
-          nameText = "(You) " + nameText;
-          playerContainer.classList.add("is-you");
-        }
-        nameHeader.textContent = nameText;
-        playerContainer.appendChild(nameHeader);
-
-        const attributesP = document.createElement("p");
-        attributesP.innerHTML = `
-          Cards: ${player.cards.map(fancy_name).join(", ")}<br>
-          Lost: ${player.lost}<br>
-          Second Chances: ${player.second_chances}<br>
-          Score: ${player.score}
-        `;
-        playerContainer.appendChild(attributesP);
-
-        const statusDiv = document.createElement("div");
-        statusDiv.classList.add("player-status-icons");
-        if (player.frozen) {
-          statusDiv.innerHTML += '<span title="Frozen">❄️</span>';
-        }
-        if (player.folded) {
-          statusDiv.innerHTML += '<span title="Folded">🛑</span>';
-        }
-        if (player.connected) {
-          statusDiv.innerHTML += '<span title="Connected">🔗</span>';
-        } else {
-          statusDiv.innerHTML += '<span title="Disconnected">🔌</span>';
-        }
-        playerContainer.appendChild(statusDiv);
-
-        // Add the "Use on this player" button
-        const useButton = document.createElement("button");
-        useButton.textContent = `Use on ${player.name}`;
-        useButton.onclick = () => use(player.order); // Call use function with player's order
-        playerContainer.appendChild(useButton);
-
-        playersContainer.appendChild(playerContainer);
-      }
-
-
-      document.getElementById("not_pretty").innerHTML = `
-      discard pile: ${fancy_name(game.top_discard) ?? ""}<br>
-      round number: ${game.round_number}
-      `;
-    }
-
-    function getParam(param) {
-      let res = localStorage.getItem(param) || sessionStorage.getItem(param);
-      if (!res) {
-        const urlParams = new URLSearchParams(window.location.search);
-        res = urlParams.get(param);
-      }
-      return res;
-    }
-
-  </script>
+  <script src="game.js"></script>
 </body>

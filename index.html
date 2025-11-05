@@ -8,21 +8,22 @@
 
 <body>
   <h2>Turn Over More Than 6</h2>
-  
+
+  <h3>Join a Lobby</h3>
+  <div id="game-list-container" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc;">
+    <!-- lobby list will be populated here -->
+  </div>
+ 
+  <hr>
+
   <div>
     <label>Username: </label>
     <input type="text" id="username"></input>
   </div>
+  <br>
 
-  <hr>
 
-  <h3>Join a Lobby</h3>
-  <div id="game-list-container" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc;">
-    <!-- Lobby and game list will be populated here -->
-  </div>
-  <button type="button" onclick="enter_lobby('join')">Join Selected Lobby</button>
-
-  <hr>
+  <h3>or</h3>
 
   <h3>Create a new Lobby</h3>
   <label>Lobby Name: </label>
@@ -32,151 +33,5 @@
   <p id="errors"></p>
 
   <script src="dev.js"></script>
-  <script>
-    let baseUrl = "https://tomt6.umbriac.com";
-    (async () => {
-      if (window.IS_DEV) {
-        console.log('Development environment detected, using localhost.');
-        baseUrl = 'http://localhost:8080';
-      }
-      fetch_games_and_lobbies();
-      setInterval(fetch_games_and_lobbies, 2000);
-    })();
-
-    async function fetch_games_and_lobbies() {
-      try {
-        const response = await fetch(`${baseUrl}/games`);
-        if (!response.ok) {
-          document.getElementById("errors").innerHTML = "Failed to fetch game list.";
-          return;
-        }
-        const data = await response.json();
-        const container = document.getElementById('game-list-container');
-        container.innerHTML = ''; // Clear previous list
-
-        if (data.lobbies && data.lobbies.length > 0) {
-          const lobbiesHeader = document.createElement('h4');
-          lobbiesHeader.textContent = 'Lobbies';
-          container.appendChild(lobbiesHeader);
-          data.lobbies.forEach(lobby => {
-            const div = document.createElement('div');
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = 'game_selection';
-            radio.value = lobby.uuid;
-            radio.id = `lobby-${lobby.uuid}`;
-
-            const label = document.createElement('label');
-            label.htmlFor = radio.id;
-            label.textContent = ` ${lobby.name} (${lobby.playerCount} players)`;
-
-            div.appendChild(radio);
-            div.appendChild(label);
-            container.appendChild(div);
-          });
-        }
-
-        if (data.games && data.games.length > 0) {
-          const gamesHeader = document.createElement('h4');
-          gamesHeader.textContent = 'Active Games';
-          container.appendChild(gamesHeader);
-          data.games.forEach(game => {
-            const div = document.createElement('div');
-            div.textContent = `${game.name} (${game.playerCount} players) - In Progress`;
-            container.appendChild(div);
-          });
-        }
-
-        if ((!data.lobbies || data.lobbies.length === 0) && (!data.games || data.games.length === 0)) {
-            container.textContent = 'No active lobbies or games found.';
-        }
-
-      } catch (error) {
-        console.error("Error fetching game list:", error);
-        document.getElementById("errors").innerHTML = "Error fetching game list.";
-      }
-    }
-
-    function enter_lobby(action) {
-      const username = document.getElementById("username").value;
-      if (!username) {
-        document.getElementById("errors").innerHTML = "Please enter a username.";
-        return;
-      }
-
-      let endpoint;
-      let body;
-
-      if (action === 'create') {
-        const lobbyName = document.getElementById("new_lobby_name").value;
-        if (!lobbyName) {
-          document.getElementById("errors").innerHTML = "Please enter a lobby name.";
-          return;
-        }
-        endpoint = `${baseUrl}/create`;
-        body = JSON.stringify({
-          username: username,
-          lobby_name: lobbyName
-        });
-      } else if (action === 'join') {
-        const selectedLobby = document.querySelector('input[name="game_selection"]:checked');
-        if (!selectedLobby) {
-          document.getElementById("errors").innerHTML = "Please select a lobby to join.";
-          return;
-        }
-        const lobby_uuid = selectedLobby.value;
-        endpoint = `${baseUrl}/join`;
-        body = JSON.stringify({
-          lobby_uuid: lobby_uuid,
-          username: username
-        });
-      } else {
-        return; // Should not happen
-      }
-
-      fetch(endpoint, {
-        method: "POST",
-        body: body,
-        headers: {
-          "Content-type": "application/json; charset=UTF-8"
-        }
-      }).then(response => {
-        if (!response.ok) {
-          response.text().then(text => {
-            document.getElementById("errors").innerHTML = text;
-          });
-          return Promise.reject('server error');
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log(`Received data from /${action}:`, data);
-        const uuid = data.host_uuid || data.player_uuid;
-        if (uuid) {
-          localStorage.setItem("uuid", uuid);
-          localStorage.setItem("name", username);
-          sessionStorage.setItem("uuid", uuid);
-          sessionStorage.setItem("name", username);
-          console.log("UUID and name set to", getParam("uuid"), getParam("name"), "in localStorage and sessionStorage.");
-          window.location.href = `lobby.html?uuid=${uuid}&name=${encodeURIComponent(username)}`;
-        } else {
-          console.error("UUID not found in server response.");
-          document.getElementById("errors").innerHTML = "Failed to get a valid ID from the server.";
-        }
-      })
-      .catch(error => {
-        console.error(`Error ${action}ing lobby:`, error);
-        document.getElementById("errors").innerHTML = `Error ${action}ing lobby.`;
-      });
-    }
-
-    function getParam(param) {
-      let res = localStorage.getItem(param) || sessionStorage.getItem(param);
-      if (!res) {
-        const urlParams = new URLSearchParams(window.location.search);
-        res = urlParams.get(param);
-      }
-      return res;
-    }
-  </script>
+  <script src="index.js"></script>
 </body>

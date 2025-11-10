@@ -48,16 +48,26 @@ socket.onmessage = (e) => {
   const actionFeed = document.getElementById("action-feed");
 
   if (parsed.action) { // A single new action
+    const old_highlight = document.querySelector(".highlight");
+    if (old_highlight) {
+      old_highlight.classList.remove("highlight");
+    }
     const newMessage = document.createElement("p");
     newMessage.textContent = generate_action_message(parsed.action, parsed.game);
-    actionFeed.prepend(newMessage);
+    newMessage.classList.add("highlight");
+    actionFeed.appendChild(newMessage);
+    actionFeed.scrollTop = actionFeed.scrollHeight;
   } else if (parsed.game && parsed.game.actions_log) { // Initial state with action log
     actionFeed.innerHTML = ''; // Clear the feed before populating
     for (const action of parsed.game.actions_log) {
       const newMessage = document.createElement("p");
       newMessage.textContent = generate_action_message(action, parsed.game);
-      actionFeed.prepend(newMessage);
+      actionFeed.appendChild(newMessage);
     }
+    if (actionFeed.lastChild) {
+      actionFeed.lastChild.classList.add("highlight");
+    }
+    actionFeed.scrollTop = actionFeed.scrollHeight;
   }
 
   pretty_print(parsed.game);
@@ -137,9 +147,46 @@ function fancy_name(card) {
   return card;
 }
 
+function is_active(player) {
+  return !(player.lost || player.frozen || player.folded)
+}
+
+function has_special(p) {
+  return (p.cards.includes("f") || p.cards.includes("s") || p.cards.includes("d"));
+}
+
 function pretty_print(game) {
   const playersContainer = document.getElementById("players-container");
   playersContainer.innerHTML = ""; // Clear previous content
+
+  let type  = "turn";
+  let current = game.current_player;
+  for (p of game.players) {
+    if (has_special(p)) {
+      type = "special"
+      current = p.order;
+    }
+  }
+  if (game.forced_draws) {
+    type = "forced_draw"
+    current = game.forced_draws[0];
+  }
+
+  const drawButton = document.getElementById("draw_button");
+  const foldButton = document.getElementById("fold_button");
+
+  drawButton.disabled = true;
+  foldButton.disabled = true;
+
+  if (current == game.you) {
+    if (type != "special") {
+      drawButton.disabled = false;
+    }
+    if (type == "turn") {
+      foldButton.disabled = false;
+    }
+  }
+
 
   for (const player of game.players) {
     const playerContainer = document.createElement("div");
@@ -148,13 +195,17 @@ function pretty_print(game) {
     const nameHeader = document.createElement("h3");
     let nameText = player.name;
     if (game.forced_draws && game.forced_draws[0] === player.order) {
-      nameText += " <- Forced Draws";
+      nameText += ` <- ${game.forced_draws[1]} Forced Draw${game.forced_draws[1] > 1 ? "s" : ""}`;
       playerContainer.classList.add("current-turn");
-    } else if (player.order === game.current_player) {
+    }
+    else if (has_special(player)) {
+      playerContainer.classList.add("current-turn");
+    }
+    else if (player.order === game.current_player) {
       playerContainer.classList.add("current-turn");
     }
 
-    if (player.frozen || player.folded || player.lost) {
+    if (!is_active(player)) {
       nameHeader.classList.add("inactive-player");
     }
 
@@ -163,7 +214,7 @@ function pretty_print(game) {
       playerContainer.classList.add("is-you");
       playerContainer.style.backgroundColor = your_tile_color;
     }
-    nameHeader.textContent = nameText;
+    nameHeader.textContent = (player.connected ? "🔗" : "🔌") + nameText;
     playerContainer.appendChild(nameHeader);
 
     const attributesP = document.createElement("p");
@@ -176,24 +227,26 @@ function pretty_print(game) {
 
     const statusDiv = document.createElement("div");
     statusDiv.classList.add("player-status-icons");
-    if (player.connected) {
-      statusDiv.innerHTML += '<span title="Connected">🔗</span>';
-    } else {
-      statusDiv.innerHTML += '<span title="Disconnected">🔌</span>';
-    }
     if (player.frozen) {
       statusDiv.innerHTML += '<span title="Frozen">❄️</span>';
     }
     if (player.folded) {
       statusDiv.innerHTML += '<span title="Folded">🛑</span>';
     }
+    if (player.lost) {
+      statusDiv.innerHTML += '<span title="Lost">💀</span>';
+    }
+    if (player.second_chances > 0) {
+      statusDiv.innerHTML += `<span title="Second Chances">♥️x${player.second_chances}</span>`;
+    }
     playerContainer.appendChild(statusDiv);
 
-    // Add the "Use on this player" button
-    const useButton = document.createElement("button");
-    useButton.textContent = `Use on ${player.name}`;
-    useButton.onclick = () => use(player.order); // Call use function with player's order
-    playerContainer.appendChild(useButton);
+    if (type == "special" && current == game.you) {
+      const useButton = document.createElement("button");
+      useButton.textContent = `Use on ${player.name}`;
+      useButton.onclick = () => use(player.order); // Call use function with player's order
+      playerContainer.appendChild(useButton);
+    }
 
     playersContainer.appendChild(playerContainer);
   }

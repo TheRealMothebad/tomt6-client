@@ -11,13 +11,17 @@ body {
   margin-bottom: 20px;
 }
 
+.highlight {
+  color: yellow;
+}
+
 .player-box.is-you {
   background-color: purple;
   color: white;
 }
 
 .current-turn {
-  border: 2px solid orange;
+  border: 5px solid orange;
 }
 
 .inactive-player {
@@ -70,6 +74,17 @@ body {
   margin: 0 10px;
   background-color: #555;
   color: #eee;
+  transition: transform 0.2s ease-in-out; /* Smooth transition for hover */
+}
+
+.controls-container button:not(:disabled):hover {
+  transform: scale(1.05); /* Slightly bigger on hover */
+}
+
+.controls-container button:disabled {
+  background-color: #444; /* Greyed out */
+  cursor: not-allowed; /* No-drop cursor */
+  opacity: 0.6; /* Slightly transparent */
 }
 
 .color-picker-widget {

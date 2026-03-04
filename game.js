@@ -1,41 +1,144 @@
-
 const uuid = getParam("uuid");
 let your_tile_color = "purple";
-let socket;
 let socket_url = "wss://tomt6.umbriac.com/game";
 if (window.IS_DEV) {
   console.log('Development environment detected, using localhost.');
   socket_url = 'ws://localhost:8080/game';
 }
 
-
 const lobby_screen = document.getElementById("lobby-screen");
 const game_screen = document.getElementById("game-screen");
+const actionFeed = document.getElementById("action-feed");
 
-socket = new WebSocket(socket_url);
-const message = JSON.stringify({"uuid": uuid});
+
+let socket = new WebSocket(socket_url);
+let game;
+let valid_cards = new Set(Game.build_deck());
+
+//when the connection is opened immediately send the uuid
 socket.onopen = () => {
-  socket.send(message);
-  socket.send(JSON.stringify({"action":"state"}));
+  socket.send(uuid);
 };
 
 socket.onmessage = (e) => {
-  let parsed = JSON.parse(e.data);
-  console.log("Received:", parsed);
+  let message  = e.data;
+  console.log("Received:", message);
+
+  if (message.length === 0) {
+      console.log("ERROR: Empty message from server");
+      return;
+  }
+
+  //events that can happen at any time
+  switch(message.charAt(0)) {
+    case "{":
+      //game data
+      let parsed_game = JSON.parse(message);
+      Object.setPrototypeOf(parsed_game, Game.prototype);
+      game = parsed_game;
+      console.log("got new game data", game);
+      break;
+    case "c":
+      //player connected
+      game.players[+message.slice(1)].connected = true;
+      break;
+    case "l":
+      //player disconnected (left)
+      game.players[+message.slice(1)].connected = false;
+      break;
+  }
+
+  //if the game object has not been sent then we got problems
+  if (!game) {
+    console.log("ERROR: Game data undefined unexpectedly");
+    //send the reset message (maybe the socket should be closed instead? not sure)
+    socket.send("r");
+    return;
+  }
+
+  if (game.expected_action === "start_game" && !message.startsWith("{")) {
+    //events that can only happen in lobby mode
+    switch (message.charAt(0)) {
+      case "p":
+        //new player joined
+        //get the player data (this is quite inefficient, will need to be reworked soon
+        let player = JSON.parse(message.slice(1))
+        game.players[player.order] = player;
+        break;
+      case "g":
+        //game started (go!)
+        game.expected_action = "draw_or_fold";
+        game.expected_action_player = 0;
+        emmit_action_message(`The game has started. ${current_player().name} goes first`);
+        break;
+    }
+  }
+  else {
+    //events that can only happen when the game is running
+    switch (message) {
+      case "shuffle":
+        //deck is shuffled
+        emmit_action_message("The discard pile was shuffled into the deck.");
+        //play an animation here or smth
+        break;
+      case "o":
+        //fail if a fold is not expected here
+        if (game.expected_action !== "draw_or_fold") {
+          console.log("ERROR: Unexpected fold")
+          socket.send("r");
+          return;
+        }
+        //player folded
+        emmit_action_message(`${game.players[game.expected_action_player].name} folded.`);
+        game.fold();
+        break;
+      default:
+        //don't attempt to handle the non-game messages we already handled above
+        //total spaghetti, needs to be refactored
+        if (message.startsWith("{") || message.startsWith("c") || message.startsWith("l")) {
+          break;
+        }
+        //likely a drawn card, or a player order number for use, check for each
+        if (game.expected_action === "draw_or_fold" || game.expected_action === "force_draw") {
+          if (valid_cards.has(message)) {
+            emmit_action_message(`${current_player().name} drew the card ${fancy_name(message)}.`);
+            game.expected_action === "draw_or_fold" ? game.regular_draw(message) : game.force_draw(message);
+          }
+          else {
+            console.log("ERROR: invalid card received, instead got", message);
+            socket.send("r");
+            return;
+          }
+        }
+        else if (game.expected_action === "use") {
+          if (!isNaN(+message) && +message < game.players.length) {
+            emmit_action_message(`${current_player().name} used ${fancy_name(first_action_card(current_player()))} on ${game.players[+message].name}.`);
+            console.log("using on", +message)
+            game.use(+message);
+          }
+          else {
+            console.log("ERROR: Expected use order, instead got", message);
+            socket.send("r");
+            return;
+          }
+        }
+    }
+  }
 
   //check if this is a lobby
-  if (parsed.game && !parsed.game.started) {
-    document.getElementById("welcomeMessage").textContent = `Welcome ${parsed.game.players[parsed.game.you].name}, waiting for game to start...`;
+  if (game.expected_action === "start_game") {
+    document.getElementById("welcomeMessage").textContent = `Welcome ${game.players[game.you].name}, waiting for game to start...`;
     const player_list = document.getElementById("player-list");
     //reset player list to blank so it can be repopulated
     player_list.innerHTML = "";
-    parsed.game.players.forEach(p => {
+    console.log(game.players);
+    game.players.forEach(p => {
       console.log(p);
       const player_line = document.createElement("p")
-      player_line.textContent = `${p.connected ? "🔗" : "🔌"} ${p.name} ${parsed.game.host == p.order ? "👑" : ""}`;
+      player_line.textContent = `${p.connected ? "🔗" : "🔌"} ${p.name} ${game.host_order === p.order ? "👑" : ""}`;
       player_list.appendChild(player_line);
     });
-    if (parsed.game.host == parsed.game.you) {
+    if (game.host_order === game.you) {
       document.getElementById("start-game-button").style.display = "block";
     }
     //only handle lobby stuff
@@ -45,23 +148,14 @@ socket.onmessage = (e) => {
   lobby_screen.style.display = "none";
   game_screen.style.display = "block";
 
-  const actionFeed = document.getElementById("action-feed");
+  pretty_print(game);
+  return;
 
-  if (parsed.action) { // A single new action
-    const old_highlight = document.querySelector(".highlight");
-    if (old_highlight) {
-      old_highlight.classList.remove("highlight");
-    }
-    const newMessage = document.createElement("p");
-    newMessage.textContent = generate_action_message(parsed.action, parsed.game);
-    newMessage.classList.add("highlight");
-    actionFeed.appendChild(newMessage);
-    actionFeed.scrollTop = actionFeed.scrollHeight;
-  } else if (parsed.game && parsed.game.actions_log) { // Initial state with action log
+  if (game && game.actions_log) { // Initial state with action log
     actionFeed.innerHTML = ''; // Clear the feed before populating
-    for (const action of parsed.game.actions_log) {
+    for (const action of game.actions_log) {
       const newMessage = document.createElement("p");
-      newMessage.textContent = generate_action_message(action, parsed.game);
+      newMessage.textContent = generate_action_message(action, game);
       actionFeed.appendChild(newMessage);
     }
     if (actionFeed.lastChild) {
@@ -70,61 +164,51 @@ socket.onmessage = (e) => {
     actionFeed.scrollTop = actionFeed.scrollHeight;
   }
 
-  pretty_print(parsed.game);
+  pretty_print(game);
   //document.getElementById("not_pretty").textContent = JSON.stringify(parsed);
 };
 
-function generate_action_message(action, game) {
-  if (!action) {
-    return "";
+function emmit_action_message(message) {
+  const old_highlight = document.querySelector(".highlight");
+  if (old_highlight) {
+    old_highlight.classList.remove("highlight");
   }
+  const newMessage = document.createElement("p");
+  newMessage.textContent = message;
+  newMessage.classList.add("highlight");
+  actionFeed.appendChild(newMessage);
+  actionFeed.scrollTop = actionFeed.scrollHeight;
+}
 
-  const actorName = game.players[action.actor] ? game.players[action.actor].name : "Unknown Player";
+function current_player() {
+  return game.players[game.expected_action_player];
+}
 
-  switch (action.action) {
-    case "start":
-      return `The game has started. ${actorName} goes first`;
-    case "draw":
-      return `${actorName} drew the card ${fancy_name(action.card)}.`;
-    case "fold":
-      return `${actorName} folded.`;
-    case "use":
-      const targetName = game.players[action.target] ? game.players[action.target].name : "Unknown Player";
-      return `${actorName} used ${fancy_name(action.card)} on ${targetName}.`;
-    case "shuffle":
-      return "The discard pile was shuffled into the deck.";
-    case "connect":
-      if (action.target == 1) {
-        return `${actorName} connected.`;
-      }
-      else {
-        return `${actorName} disconnected.`;
-      }
-    case "die":
-      return `${actorName} died from drawing another ${fancy_name(action.card)}`
-    case "end":
-      return `Game has ended! ${actorName} won with a score of ${game.players[action.actor].score}!`
-    default:
-      return ``;
+function first_action_card(player) {
+  for (let card of player.cards) {
+    if (["f", "s", "d"].includes(card)) {
+      return card;
+    }
   }
+  return null;
 }
 
 function start_game() {
   console.log("attempting to start game");
-  socket.send(JSON.stringify({"action":"start"}));
+  socket.send("s");
 }
 
 function draw() {
   console.log("attempting draw");
-  socket.send(JSON.stringify({"action":"draw"}));
+  socket.send("d");
 }
 function fold() {
   console.log("attempting fold");
-  socket.send(JSON.stringify({"action":"fold"}));
+  socket.send("f");
 }
 function use(order_target) {
   console.log("use on", order_target);
-  socket.send(JSON.stringify({"action":"use", "target":order_target}));
+  socket.send(order_target);
 }
 
 function change_color(color) {
@@ -151,58 +235,38 @@ function is_active(player) {
   return !(player.lost || player.frozen || player.folded)
 }
 
-function has_special(p) {
-  return (p.cards.includes("f") || p.cards.includes("s") || p.cards.includes("d"));
-}
-
 function pretty_print(game) {
   const playersContainer = document.getElementById("players-container");
   playersContainer.innerHTML = ""; // Clear previous content
 
-  let type  = "turn";
-  let current = game.current_player;
-  for (p of game.players) {
-    if (has_special(p)) {
-      type = "special"
-      current = p.order;
-    }
-  }
-  if (game.forced_draws) {
-    type = "forced_draw"
-    current = game.forced_draws[0];
-  }
-
   const drawButton = document.getElementById("draw_button");
   const foldButton = document.getElementById("fold_button");
 
-  drawButton.disabled = true;
-  foldButton.disabled = true;
+  if (drawButton) drawButton.disabled = true;
+  if (foldButton) foldButton.disabled = true;
 
-  if (current == game.you) {
-    if (type != "special") {
+  if (game.expected_action_player === game.you && drawButton && foldButton) {
+    if (game.expected_action === "draw_or_fold" || game.expected_action === "force_draw") {
       drawButton.disabled = false;
     }
-    if (type == "turn") {
+    if (game.expected_action === "draw_or_fold") {
       foldButton.disabled = false;
     }
   }
-
 
   for (const player of game.players) {
     const playerContainer = document.createElement("div");
     playerContainer.classList.add("player-box");
 
+    if (game.expected_action_player === player.order) {
+      playerContainer.classList.add("current-turn");
+    }
+
     const nameHeader = document.createElement("h3");
     let nameText = player.name;
-    if (game.forced_draws && game.forced_draws[0] === player.order) {
-      nameText += ` <- ${game.forced_draws[1]} Forced Draw${game.forced_draws[1] > 1 ? "s" : ""}`;
-      playerContainer.classList.add("current-turn");
-    }
-    else if (has_special(player)) {
-      playerContainer.classList.add("current-turn");
-    }
-    else if (player.order === game.current_player) {
-      playerContainer.classList.add("current-turn");
+    let active_forced_draw = game.forced_draws[game.forced_draws.length - 1]
+    if (active_forced_draw &&  active_forced_draw[0] === player.order) {
+      nameText += ` <- ${active_forced_draw[1]} Forced Draw${active_forced_draw[1] > 1 ? "s" : ""}`;
     }
 
     if (!is_active(player)) {
@@ -241,7 +305,9 @@ function pretty_print(game) {
     }
     playerContainer.appendChild(statusDiv);
 
-    if (type == "special" && current == game.you) {
+    if (game.expected_action_player === game.you &&
+      game.expected_action === "use" &&
+      is_active(player)) {
       const useButton = document.createElement("button");
       useButton.textContent = `Use on ${player.name}`;
       useButton.onclick = () => use(player.order); // Call use function with player's order
@@ -251,11 +317,43 @@ function pretty_print(game) {
     playersContainer.appendChild(playerContainer);
   }
 
-
   document.getElementById("not_pretty").innerHTML = `
-      discard pile: ${fancy_name(game.top_discard) ?? ""}<br>
+      discard pile: ${fancy_name(game.discard_top) ?? ""}<br>
       round number: ${game.round_number}
       `;
+}
+
+Game.prototype.seven_cards_animation = function(player) {
+  emmit_action_message(`${player.name} drew 7 number cards and ended the round with 15 extra points!`);
+  //do nothing
+}
+
+Game.prototype.death_animation = function(player, card) {
+  emmit_action_message(`${player.name} died from drawing another ${fancy_name(card)}`)
+  //do nothing
+}
+
+Game.prototype.new_round_animation = function () {
+  emmit_action_message(`Round ${game.round_number - 1} has ended, starting round ${game.round_number}`)
+}
+
+Game.prototype.game_over = function(winner_order) {
+  console.log(game.players[winner_order].name, "won!");
+  emmit_action_message(`Game has ended! ${game.players[winner_order].name} won with a score of ${game.players[winner_order].score}!`);
+  
+  document.getElementById("draw_button").style.display = "none";
+  document.getElementById("fold_button").style.display = "none";
+  
+  let button_box = document.getElementById("controls");
+  let gameOverDiv = document.getElementById("game-over-message");
+  if (!gameOverDiv) {
+    gameOverDiv = document.createElement("div");
+    gameOverDiv.id = "game-over-message";
+    button_box.appendChild(gameOverDiv);
+  }
+  
+  gameOverDiv.innerHTML = `Game has ended, ${game.players[winner_order].name} has won! <button type="button" onclick="window.location.href='index.html'">Play again</button>`;
+  //do nothing
 }
 
 function getParam(param) {

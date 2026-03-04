@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card Drag Demo</title>
+  <link rel="stylesheet" href="card.css" />
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+</head>
+<body>
+
+<div id="board">
+  <div class="zone ordered" data-zone="hand">Hand Zone</div>
+  <div class="zone" data-zone="table">Table Zone</div>
+</div>
+
+<div id="cards-layer">
+  <div class="card" data-id="A♠">A♠</div>
+  <div class="card" data-id="K♥">K♥</div>
+  <div class="card" data-id="Q♣">Q♣</div>
+  <div class="card" data-id="J♦">J♦</div>
+</div>
+
+<script src="card.js"></script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Card Draw Demo (Fixed)</title>
+
+<style>
+  body {
+    margin: 0;
+    background: #0b5c3a;
+    font-family: sans-serif;
+    overflow: hidden;
+  }
+
+  .table {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* Players */
+  .players {
+    display: flex;
+    justify-content: space-around;
+    padding-top: 60px;
+  }
+
+  .player {
+    width: 30%;
+    min-height: 180px;
+    border: 2px dashed rgba(255,255,255,0.5);
+    padding: 10px;
+    box-sizing: border-box;
+  }
+
+  .player h3 {
+    margin: 0 0 10px;
+    color: white;
+    text-align: center;
+  }
+
+  .hand {
+    display: flex;
+    gap: 10px;
+  }
+
+  /* Deck */
+  .deck {
+    position: absolute;
+    bottom: 90px;
+    right: 40px;
+    width: 80px;
+    height: 120px;
+    border-radius: 8px;
+    background: #222;
+    border: 2px solid #444;
+  }
+
+  /* Controls */
+  .controls {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+  }
+
+  button {
+    font-size: 18px;
+    padding: 10px 30px;
+    cursor: pointer;
+  }
+
+  /* Card animation structure */
+  .card-wrapper {
+    position: absolute;
+    width: 80px;
+    height: 120px;
+    perspective: 800px;
+    pointer-events: none;
+  }
+
+  .card {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+  }
+
+  .card-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+  }
+
+  .card-back {
+    background: repeating-linear-gradient(
+      45deg,
+      #333,
+      #333 10px,
+      #555 10px,
+      #555 20px
+    );
+    color: transparent;
+  }
+
+  .card-front {
+    background: white;
+    color: black;
+    transform: rotateY(180deg);
+  }
+</style>
+</head>
+
+<body>
+<div class="table">
+  <div class="players">
+    <div class="player">
+      <h3>Player 1</h3>
+      <div class="hand"></div>
+    </div>
+    <div class="player">
+      <h3>Player 2</h3>
+      <div class="hand"></div>
+    </div>
+    <div class="player">
+      <h3>Player 3</h3>
+      <div class="hand"></div>
+    </div>
+  </div>
+
+  <div class="deck"></div>
+
+  <div class="controls">
+    <button id="drawBtn">Draw</button>
+  </div>
+</div>
+
+<script>
+/* ===============================
+   Debug-friendly configuration
+   =============================== */
+
+const ANIMATION = {
+  flipDuration: 800,
+  liftDuration: 600,
+  moveDuration: 1200,
+  liftScale: 1.25,
+  pauseBetween: 200
+};
+
+const CARD = {
+  width: 80,
+  height: 120,
+  spacing: 90
+};
+
+/* ===============================
+   Game state
+   =============================== */
+
+const deck = document.querySelector('.deck');
+const players = document.querySelectorAll('.player');
+const drawBtn = document.getElementById('drawBtn');
+
+let currentPlayer = 0;
+let cardNumber = 1;
+
+drawBtn.addEventListener('click', drawCard);
+
+function drawCard() {
+  drawBtn.disabled = true;
+
+  const deckRect = deck.getBoundingClientRect();
+  const player = players[currentPlayer];
+  const hand = player.querySelector('.hand');
+
+  /* Create animated card */
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card-wrapper';
+  wrapper.style.left = deckRect.left + 'px';
+  wrapper.style.top = deckRect.top + 'px';
+
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const back = document.createElement('div');
+  back.className = 'card-face card-back';
+
+  const front = document.createElement('div');
+  front.className = 'card-face card-front';
+  front.textContent = cardNumber++;
+
+  card.appendChild(back);
+  card.appendChild(front);
+  wrapper.appendChild(card);
+  document.body.appendChild(wrapper);
+
+  /* Step 1: Flip */
+  requestAnimationFrame(() => {
+    card.style.transition = `transform ${ANIMATION.flipDuration}ms ease`;
+    card.style.transform = 'rotateY(180deg)';
+  });
+
+  /* Step 2: Lift */
+  setTimeout(() => {
+    card.style.transition = `transform ${ANIMATION.liftDuration}ms ease`;
+    card.style.transform =
+      `rotateY(180deg) scale(${ANIMATION.liftScale})`;
+  }, ANIMATION.flipDuration + ANIMATION.pauseBetween);
+
+  /* Step 3: Move to player */
+  setTimeout(() => {
+    const handRect = hand.getBoundingClientRect();
+    const x = handRect.left + hand.children.length * CARD.spacing;
+    const y = handRect.top;
+
+    wrapper.style.transition =
+      `left ${ANIMATION.moveDuration}ms ease,
+       top ${ANIMATION.moveDuration}ms ease`;
+
+    wrapper.style.left = x + 'px';
+    wrapper.style.top = y + 'px';
+
+    card.style.transition = `transform ${ANIMATION.moveDuration}ms ease`;
+    card.style.transform = 'rotateY(180deg) scale(1)';
+  }, ANIMATION.flipDuration +
+     ANIMATION.liftDuration +
+     ANIMATION.pauseBetween * 2);
+
+  /* Step 4: Attach to hand */
+  setTimeout(() => {
+    wrapper.remove();
+    front.style.transform = 'none';
+    front.style.position = 'static';
+    front.style.width = CARD.width + 'px';
+    front.style.height = CARD.height + 'px';
+
+    hand.appendChild(front);
+
+    currentPlayer = (currentPlayer + 1) % players.length;
+    drawBtn.disabled = false;
+  }, ANIMATION.flipDuration +
+     ANIMATION.liftDuration +
+     ANIMATION.moveDuration +
+     ANIMATION.pauseBetween * 3);
+}
+</script>
+</body>
+</html>
+

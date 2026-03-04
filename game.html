@@ -28,7 +28,7 @@
   </div>
   <div id="game-screen" style="display: none;">
     <h2>Turn Over More Than 6 Active Game</h2>
-    <div class="controls-container">
+    <div class="controls-container" id="controls">
       <button type="button" id="draw_button" onclick="draw()">draw</button>
       <button type="button" id="fold_button" onclick="fold()">fold</button>
     </div>
@@ -40,5 +40,6 @@
 
   <p id="not_pretty"></p> 
   <script src="dev.js"></script>
+  <script src="game.shared.js"></script>
   <script src="game.js"></script>
 </body>

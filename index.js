@@ -1,6 +1,6 @@
 
 console.log("client starting");
-let api_url = "https://tomt6.umbriac.com"
+let api_url = "https://tomt6-api.umbriac.com"
 if (window.IS_DEV) {
 console.log('Development environment detected, using localhost.');
   api_url = 'http://localhost:8080';

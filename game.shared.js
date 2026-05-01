@@ -48,6 +48,17 @@ var Game = class {
     this.host_order = this.add_player(host_name).order;
     this.expected_action_player = this.host_order;
   }
+  start() {
+    return "";
+  }
+  seven_cards_animation(player) {
+  }
+  death_animation(player, card) {
+  }
+  new_round_animation() {
+  }
+  game_over(winner_order) {
+  }
   add_player(name) {
     const player = new Player(name, this.players.length);
     this.players[player.order] = player;
@@ -65,7 +76,9 @@ var Game = class {
         this.check_handle_round_over();
       }
     }
-    this.current_turn = this.next_in_turn_order();
+    if (card != "f") {
+      this.current_turn = this.next_in_turn_order();
+    }
     console.log("current_turn has moved to", this.players[this.current_turn].order);
     if (!this.is_action_card(card)) {
       this.expected_action_player = this.current_turn;
@@ -99,7 +112,7 @@ var Game = class {
   queue_unplayed_action_cards() {
     while (this.forced_draws.length > 0) {
       let top_forced_draw = this.forced_draws.pop();
-      if (this.has_action_card(this.players[top_forced_draw[2]])) {
+      if (this.has_action_card(this.players[top_forced_draw[2]]) && is_active(this.players[top_forced_draw[2]])) {
         this.expected_action_player = top_forced_draw[2];
         this.expected_action = "use";
         return;
@@ -118,12 +131,13 @@ var Game = class {
       return "o";
     } catch (e) {
       console.log(e);
+      return "e";
     }
   }
   use(target_order) {
     const player = this.players[this.expected_action_player];
     const target = this.players[target_order];
-    let action_card;
+    let action_card = "";
     for (let card of player.cards) {
       if ([
         "f",
@@ -244,8 +258,10 @@ var Game = class {
       this.reset_players();
       this.round_number++;
       if (this.check_handle_game_over()) {
-        console.log("Game is over", this.players[this.winner_order].name, "won");
-        this.game_over(this.winner_order);
+        if (this.winner_order !== null) {
+          console.log("Game is over", this.players[this.winner_order].name, "won");
+          this.game_over(this.winner_order);
+        }
         console.log("after game over");
       } else {
         this.new_round_animation();

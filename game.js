@@ -1,6 +1,6 @@
 const uuid = getParam("uuid");
 let your_tile_color = "purple";
-let socket_url = "wss://tomt6.umbriac.com/game";
+let socket_url = "wss://tomt6-api.umbriac.com/game";
 if (window.IS_DEV) {
   console.log('Development environment detected, using localhost.');
   socket_url = 'ws://localhost:8080/game';

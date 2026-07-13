@@ -112,7 +112,7 @@ var Game = class {
   queue_unplayed_action_cards() {
     while (this.forced_draws.length > 0) {
       let top_forced_draw = this.forced_draws.pop();
-      if (this.has_action_card(this.players[top_forced_draw[2]]) && is_active(this.players[top_forced_draw[2]])) {
+      if (this.has_action_card(this.players[top_forced_draw[2]]) && this.active(this.players[top_forced_draw[2]].order)) {
         this.expected_action_player = top_forced_draw[2];
         this.expected_action = "use";
         return;
@@ -137,6 +137,7 @@ var Game = class {
   use(target_order) {
     const player = this.players[this.expected_action_player];
     const target = this.players[target_order];
+    const self_freeze = target_order == player.order;
     let action_card = "";
     for (let card of player.cards) {
       if ([
@@ -177,7 +178,7 @@ var Game = class {
         console.log(target.name, "needs to draw 3");
         break;
     }
-    if (action_card != "d" && !this.has_action_card(player)) {
+    if (action_card != "d" && (!this.has_action_card(player) || self_freeze)) {
       this.expected_action_player = this.current_turn;
       this.expected_action = "draw_or_fold";
     }

@@ -1,37 +1,58 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width">
-<title>Turn Over More Than 6</title>
-<link rel="stylesheet" type="text/css" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Turn Over More Than 6</title>
+  <!-- table.css provides the shared colours and base styles, lobby.css lays out this page -->
+  <link rel="stylesheet" type="text/css" href="table.css" />
+  <link rel="stylesheet" type="text/css" href="lobby.css" />
 </head>
 
 <body>
-  <h2>Turn Over More Than 6</h2>
+  <!-- starts as "stage-name" (just the username prompt), becomes "stage-browse" once a name is chosen -->
+  <main id="lobby-page" class="stage-name">
 
-  <h3>Join a Lobby</h3>
-  <div id="game-list-container" style="height: 150px; overflow-y: scroll; border: 1px solid #ccc;">
-    <!-- lobby list will be populated here -->
-  </div>
- 
-  <hr>
+    <!-- the username prompt. it glides to the top and stays there as the "playing as" header -->
+    <section id="name-card">
+      <h1 id="game-title">Turn Over More Than 6</h1>
+      <form id="name-form" autocomplete="off">
+        <label for="username" id="name-label">Choose a username</label>
+        <div class="name-row">
+          <input type="text" id="username" maxlength="25" spellcheck="false" autocapitalize="off" placeholder="Your name">
+          <button type="submit" class="btn primary" id="name-submit">Continue</button>
+        </div>
+      </form>
+    </section>
 
-  <div>
-    <label>Username: </label>
-    <input type="text" id="username"></input>
-  </div>
-  <br>
+    <section id="browser" hidden>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Open lobbies</h2>
+          <span id="live-status"></span>
+        </div>
+        <div id="game-list-container">
+          <!-- lobby list will be populated here -->
+        </div>
+      </div>
 
+      <form class="panel" id="create-form" autocomplete="off">
+        <div class="panel-head">
+          <h2>Start your own</h2>
+        </div>
+        <div class="create-row">
+          <input type="text" id="new_lobby_name" maxlength="25" placeholder="Lobby name">
+          <button type="submit" class="btn primary">Create lobby</button>
+        </div>
+      </form>
 
-  <h3>or</h3>
+      <p id="errors" role="alert"></p>
 
-  <h3>Create a new Lobby</h3>
-  <label>Lobby Name: </label>
-  <input type="text" id="new_lobby_name"></input>
-  <button type="button" onclick="enter_lobby('create')">Create Lobby</button>
-  
-  <p id="errors"></p>
+      <p class="practice"><a href="game.html?demo">Practice against bots</a></p>
+    </section>
+  </main>
 
   <script src="dev.js"></script>
   <script src="index.js"></script>
 </body>
+</html>

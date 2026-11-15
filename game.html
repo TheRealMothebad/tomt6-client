@@ -1,45 +1,93 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Turn Over More Than 6</title>
-  <link rel="stylesheet" type="text/css" href="style.css" />
+  <link rel="stylesheet" type="text/css" href="table.css" />
 </head>
 
 <body>
-  <div class="color-picker-widget">
-    <button class="color-btn" style="background-color: #A52A2A;" onclick="change_color('#A52A2A')"></button>
-    <button class="color-btn" style="background-color: #228B22;" onclick="change_color('#228B22')"></button>
-    <button class="color-btn" style="background-color: #DAA520;" onclick="change_color('#DAA520')"></button>
-    <button class="color-btn" style="background-color: purple;" onclick="change_color('purple')"></button>
-  </div>
-
-
+  <!-- waiting room shown until the host starts the game -->
   <div id="lobby-screen">
-    <h2 id="welcomeMessage"></h2>
+    <div class="lobby-card">
+      <h2 id="welcomeMessage">Connecting...</h2>
+      <h3>Players in lobby</h3>
+      <div id="player-list">
+        <!-- player list will be populated here -->
+      </div>
+      <button type="button" onclick="start_game()" id="start-game-button" hidden>Start Game</button>
+      <p id="errors"></p>
 
-    <h3>Players in lobby:</h3>
-    <div id="player-list">
-      <!-- player list will be populated here -->
+      <!-- personal settings, saved in this browser. they do not affect the other players -->
+      <div id="settings">
+        <h3>Your settings</h3>
+        <div class="setting">
+          <span class="setting-name" id="speed-label">Animation speed</span>
+          <div class="segmented" id="speed-setting" role="radiogroup" aria-labelledby="speed-label">
+            <button type="button" role="radio" data-value="0.7">Relaxed</button>
+            <button type="button" role="radio" data-value="1">Normal</button>
+            <button type="button" role="radio" data-value="1.5">Fast</button>
+            <button type="button" role="radio" data-value="2.5">Very fast</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span class="setting-name">Keyboard shortcuts <small>D to draw, F to fold</small></span>
+          <input type="checkbox" id="shortcuts-setting">
+        </label>
+        <p class="setting-note">Only changes your own screen.</p>
+      </div>
     </div>
-
-    <button type="button" onclick="start_game()" id="start-game-button" style="display: none;">Start Game</button>
-    <p id="errors"></p>
   </div>
-  <div id="game-screen" style="display: none;">
-    <h2>Turn Over More Than 6 Active Game</h2>
-    <div class="controls-container" id="controls">
-      <button type="button" id="draw_button" onclick="draw()">draw</button>
-      <button type="button" id="fold_button" onclick="fold()">fold</button>
-    </div>
 
-    <div id="action-feed"></div>
-    <div id="players-container">
-    </div>
+  <div id="game-screen" hidden>
+    <header id="topbar">
+      <div id="round-chip">Round 1</div>
+      <div id="banner">
+        <div id="banner-main"></div>
+        <div id="last-action"></div>
+      </div>
+      <button type="button" id="log-button" onclick="toggle_log()" aria-expanded="false">Log</button>
+    </header>
+
+    <!-- every other player gets an outlined area in here, in turn order -->
+    <main id="opponents"></main>
+
+    <!-- your own area is pinned above the controls -->
+    <section id="me-slot"></section>
+
+    <footer id="tray">
+      <div id="controls">
+        <button type="button" id="draw_button" onclick="draw()" disabled>Draw</button>
+        <button type="button" id="fold_button" onclick="fold()" disabled>Fold</button>
+      </div>
+      <div id="piles">
+        <div class="pile" id="discard-pile">
+          <div class="pile-slot" id="discard-slot"></div>
+          <div class="pile-label">Discard <span id="discard-count"></span></div>
+        </div>
+        <div class="pile" id="deck-pile">
+          <div class="pile-slot" id="deck-slot"></div>
+          <div class="pile-label">Deck <span id="deck-count"></span></div>
+        </div>
+      </div>
+    </footer>
+
+    <aside id="log-panel" hidden>
+      <div id="action-feed"></div>
+    </aside>
+
+    <div id="announce"></div>
+    <div id="game-over" hidden></div>
   </div>
 
-  <p id="not_pretty"></p> 
+  <div id="conn-status" hidden></div>
+  <!-- cards that are mid-flight between areas live in this layer -->
+  <div id="fx"></div>
+
   <script src="dev.js"></script>
   <script src="game.shared.js"></script>
+  <script src="demo.js"></script>
   <script src="game.js"></script>
 </body>
+</html>
